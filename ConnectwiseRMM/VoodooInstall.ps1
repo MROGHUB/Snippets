@@ -1,7 +1,4 @@
-﻿    [CmdletBinding()]
-    param()
-
-    Write-Host "Running Voodoo Install..." -ForegroundColor Green
+﻿    Write-Host "Running Voodoo Install..." -ForegroundColor Green
     $Dir = "C:\Temp\"
 
     function CreateDirectory {
