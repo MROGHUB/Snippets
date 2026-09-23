@@ -59,7 +59,7 @@ if (!(Test-Path $outputDir)) {
     New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
 }
 
-# Explicitly build the path using the hardcoded C:\driver directory
+# Explicitly build the path using the hardcoded directory
 $timestamp = (Get-Date).ToString("yyyy-MM-dd_HHmmss")
 $targetFile = "C:\driver\$timestamp.jpg"
 
