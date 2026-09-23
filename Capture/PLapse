@@ -1,0 +1,68 @@
+$code = @"
+using System;
+using System.Runtime.InteropServices;
+using System.Drawing;
+using System.Drawing.Imaging;
+
+public class WindowsWebcam {
+    // Windows API hook into the native webcam library
+    [DllImport("avicap32.dll", EntryPoint = "capCreateCaptureWindowA")]
+    public static extern IntPtr capCreateCaptureWindowA(string lpszWindowName, int dwStyle, int x, int y, int nWidth, int nHeight, IntPtr hWndParent, int nID);
+
+    [DllImport("user32.dll")]
+    public static extern bool SendMessage(IntPtr hWnd, uint Msg, int wParam, int lParam);
+
+    [DllImport("user32.dll")]
+    public static extern bool DestroyWindow(IntPtr hWnd);
+
+    private const uint WM_CAP_START = 0x0400;
+    private const uint WM_CAP_DRIVER_CONNECT = WM_CAP_START + 10;
+    private const uint WM_CAP_DRIVER_DISCONNECT = WM_CAP_START + 11;
+    private const uint WM_CAP_GRAB_FRAME = WM_CAP_START + 60;
+    private const uint WM_CAP_EDIT_COPY = WM_CAP_START + 30;
+
+    public static void TakeSnapshot(string outputPath) {
+        // Create a hidden, invisible background window stream
+        IntPtr hWndCam = capCreateCaptureWindowA("HiddenCaptureWindow", 0, 0, 0, 0, 0, IntPtr.Zero, 0);
+        
+        // Connect to the default camera (Index 0)
+        if (SendMessage(hWndCam, WM_CAP_DRIVER_CONNECT, 0, 0)) {
+            System.Threading.Thread.Sleep(2000); // 2-second delay to let camera adjust exposure
+            
+            SendMessage(hWndCam, WM_CAP_GRAB_FRAME, 0, 0); // Grab current frame
+            SendMessage(hWndCam, WM_CAP_EDIT_COPY, 0, 0);  // Send it quietly to clipboard buffer
+            SendMessage(hWndCam, WM_CAP_DRIVER_DISCONNECT, 0, 0);
+            
+            // Extract the image data from memory and save it
+            if (System.Windows.Forms.Clipboard.ContainsImage()) {
+                Image img = System.Windows.Forms.Clipboard.GetImage();
+                img.Save(outputPath, ImageFormat.Jpeg);
+                img.Dispose();
+            }
+        }
+        DestroyWindow(hWndCam);
+    }
+}
+"@
+
+# Load the user forms assembly to handle the snapshot data
+Add-Type -AssemblyName System.Windows.Forms
+
+# Only compile the C# type if it hasn't been loaded in this session yet
+if (-not ([System.Management.Automation.PSTypeName]'WindowsWebcam').Type) {
+    Add-Type -TypeDefinition $code -ReferencedAssemblies "System.Windows.Forms","System.Drawing"
+}
+
+# Ensure target directory exists
+$outputDir = "C:\driver"
+if (!(Test-Path $outputDir)) {
+    New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
+}
+
+# Explicitly build the path using the hardcoded C:\driver directory
+$timestamp = (Get-Date).ToString("yyyy-MM-dd_HHmmss")
+$targetFile = "C:\driver\$timestamp.jpg"
+
+Write-Host "Initializing camera..."
+[WindowsWebcam]::TakeSnapshot($targetFile)
+Write-Host "Snapshot successfully saved to: $targetFile"
